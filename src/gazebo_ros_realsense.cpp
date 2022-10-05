@@ -1,6 +1,7 @@
 #include "realsense_gazebo_plugin/gazebo_ros_realsense.h"
 #include <sensor_msgs/fill_image.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
+#include <random>
 
 namespace {
 std::string extractCameraName(const std::string &name);
@@ -17,6 +18,9 @@ GazeboRosRealsense::GazeboRosRealsense() {}
 GazeboRosRealsense::~GazeboRosRealsense() {
   ROS_DEBUG_STREAM_NAMED("realsense_camera", "Unloaded");
 }
+
+std::default_random_engine generator;
+std::normal_distribution<double> distribution(0.0,0.075);
 
 void GazeboRosRealsense::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
   // Make sure the ROS node for Gazebo has already been initialized
@@ -139,6 +143,7 @@ bool GazeboRosRealsense::FillPointCloudHelper(sensor_msgs::PointCloud2 &point_cl
 
     for (uint32_t i = 0; i < cols_arg; i++, ++iter_x, ++iter_y, ++iter_z, ++iter_rgb)
     {
+      double noise = distribution(generator);
       double yAngle;
       if (cols_arg > 1)
         yAngle = atan2((double)i - 0.5 * (double)(cols_arg - 1), fl);
@@ -153,9 +158,10 @@ bool GazeboRosRealsense::FillPointCloudHelper(sensor_msgs::PointCloud2 &point_cl
         // hardcoded rotation rpy(-M_PI/2, 0, -M_PI/2) is built-in
         // to urdf, where the *_optical_frame should have above relative
         // rotation from the physical camera *_frame
-        *iter_x = depth * tan(yAngle);
-        *iter_y = depth * tan(pAngle);
-        *iter_z = depth;
+        // CHANGED BY TTR TO APPLY NOISE TO PC
+        *iter_x = depth * tan(yAngle) + ((depth/5) * noise);
+        *iter_y = depth * tan(pAngle) + ((depth/5) * noise);
+        *iter_z = depth + ((depth/5) * (noise/8));
       }
       else  // point in the unseeable range
       {
